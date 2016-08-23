@@ -23,6 +23,10 @@ public class StringParser {
     public String inputFor;
     public ParsedData parcedData;
     
+    public StringParser(){
+        parcedData = new ParsedData();
+    }
+    
     //<editor-fold defaultstate="collapsed" desc="Getters and setters">
     public void setReturnCode(int returnCode) {
         this.returnCode = returnCode;
@@ -78,7 +82,7 @@ public class StringParser {
     
     public void generateReturnCode(){
         String pointer = inputCommand[1];
-        pointer = pointer.toUpperCase(); 
+        pointer = pointer.toUpperCase();
         switch (pointer) {
             
             case "ADDME":{
@@ -130,8 +134,8 @@ public class StringParser {
     
     public class ParsedData{
         
-        public String userName; 
-        public String roomName;
+        public String userName=null;
+        public String roomName=null;
         
     }
     

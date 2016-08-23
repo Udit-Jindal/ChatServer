@@ -48,7 +48,7 @@ public class ChatServer {
         int i = 0;
         synchronized(chatRoomList){
             for(ChatRoom rm:chatRoomList){
-                chatRoomListString = chatRoomListString + i
+                chatRoomListString = chatRoomListString + i++
                         +". " +rm.getName()+"\n";
             }
         }
@@ -177,9 +177,10 @@ public class ChatServer {
                 
                 case 004:{
                     ChatRoom localChatRoom = getRoomFromName(roomName);
-                    if(localChatRoom != null){
+                    if(localChatRoom == null){
                         ChatRoom newChatRoom = new ChatRoom(user);
                         chatRoomList.add(newChatRoom);
+                        updateRoomListString();
                         user.setChatRoomname(roomName);
                         user.getOutputStream().println("#FROMSERVER"+ " "
                                 +"NEWROOMCREATED"

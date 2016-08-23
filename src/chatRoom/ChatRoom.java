@@ -25,6 +25,7 @@ public class ChatRoom {
     public ChatRoom(User user){
         users = new ArrayList();
         users.add(user);
+        updateUserList();
     }
     
     public String getName() {
@@ -36,7 +37,7 @@ public class ChatRoom {
         int i = 0;
         synchronized(users){
             for(User userObj:users){
-                userListString = userListString + i
+                userListString = userListString + i++
                         +". " +userObj.getName()+"\n";
             }
         }
