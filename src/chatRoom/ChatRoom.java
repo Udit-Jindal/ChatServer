@@ -17,4 +17,9 @@ public class ChatRoom {
     List<User> users;
     Socket socket;
     String name;
+
+    public String getName() {
+        return name;
+    }
+        
 }

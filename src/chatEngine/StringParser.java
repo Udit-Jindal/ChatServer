@@ -5,19 +5,25 @@
 */
 package chatEngine;
 
+import java.util.Arrays;
+
 /**
  *
  * @author Raghu
  */
 public class StringParser {
     
-    private String inputLine;
+//    private String inputLine;
     private int returnCode;
     private String[] inputCommand;
     private String returnString;
+    private static final String delimitor = " ";
     
-    public boolean isCommand;
+    public boolean isCommand = false;
+    public String inputFor;
+    public ParsedData parcedData;
     
+    //<editor-fold defaultstate="collapsed" desc="Getters and setters">
     public void setReturnCode(int returnCode) {
         this.returnCode = returnCode;
     }
@@ -37,10 +43,7 @@ public class StringParser {
     public int getReturnCode() {
         return returnCode;
     }
-    
-    public void setInputLine(String inputLine) {
-        this.inputLine = inputLine;
-    }
+    //</editor-fold>
     
     public void processInput(String inputLine){
         parseInput(inputLine);
@@ -55,9 +58,80 @@ public class StringParser {
     
     public void parseInput(String input){
         
+        String[] tempArray = input.split(delimitor);
+        
+        if(tempArray[0].equalsIgnoreCase("@SERVER")){
+            isCommand = true;
+            inputCommand = tempArray;
+            inputFor = "SERVER";
+            generateReturnCode();
+        }else if(tempArray[0].contains("@")){
+            inputFor = tempArray[0].replace("@", "");
+            tempArray[0] = "";
+            returnString = Arrays.toString(tempArray);
+        }
+        else{
+            this.returnString = input;
+            inputFor = "ALL";
+        }
     }
     
     public void generateReturnCode(){
+        String pointer = inputCommand[1];
+        pointer = pointer.toUpperCase(); 
+        switch (pointer) {
+            
+            case "ADDME":{
+                returnCode = 000;
+                parcedData.userName = inputCommand[2];
+            }
+            break;
+            
+            case "SHOWROOMLIST":{
+                returnCode = 001;
+            }
+            break;
+            
+            case "SHOWUSERLIST":{
+                returnCode = 002;
+            }
+            break;
+            
+            case "SHOWUSERINROOMLIST":{
+                returnCode = 003;
+                parcedData.roomName = inputCommand[2];
+            }
+            break;
+            
+            case "CONNECTTOROOM":{
+                returnCode = 004;
+                parcedData.roomName = inputCommand[2];
+            }
+            break;
+            
+            case "EXITROOM":{
+                returnCode = 005;
+            }
+            break;
+            
+            case "EXIT":{
+                returnCode = 111;
+            }
+            break;
+            
+            default:
+            {
+                returnCode = 400;//Malformed Request.
+            }
+        }
+        
+    }
+    
+    
+    public class ParsedData{
+        
+        public String userName; 
+        public String roomName;
         
     }
     

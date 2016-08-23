@@ -32,6 +32,18 @@ public class User{
         this.setSocketStreams(socket);
     }
     
+    public String getName() {
+        return name;
+    }
+    
+    public BufferedReader getInputStream() {
+        return inputStream;
+    }
+    
+    public PrintStream getOutputStream() {
+        return outputStream;
+    }
+    
     public void setSocketStreams(Socket socket) throws IOException {
         this.socket = socket;
         this.setStreams(socket.getInputStream(),socket.getOutputStream());
@@ -42,12 +54,8 @@ public class User{
         this.outputStream = new PrintStream(outputStream);
     }
     
-    public BufferedReader getInputStream() {
-        return inputStream;
-    }
-    
-    public PrintStream getOutputStream() {
-        return outputStream;
+    public void setName(String name) {
+        this.name = name;
     }
     
     public void closeInputStream() throws IOException{
