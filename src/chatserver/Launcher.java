@@ -3,18 +3,16 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package chatRoom;
-
-import java.net.Socket;
-import java.util.List;
-import user.User;
+package chatserver;
 
 /**
  *
  * @author Raghu
  */
-public class ChatRoom {
-    List<User> users;
-    Socket socket;
-    String name;
+public class Launcher {
+    
+     public static void main(String[] args) {
+         ChatServer chatServer = new ChatServer();        
+    }
+    
 }
