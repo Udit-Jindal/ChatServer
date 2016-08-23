@@ -27,6 +27,7 @@ public class User{
     ChatRoom currentlyAssignedChatRoom;
     Socket socket;
     String name;
+    String chatRoomname;
     
     public User(Socket socket) throws IOException{
         this.setSocketStreams(socket);
@@ -43,6 +44,10 @@ public class User{
     public PrintStream getOutputStream() {
         return outputStream;
     }
+
+    public String getChatRoomname() {
+        return chatRoomname;
+    }
     
     public void setSocketStreams(Socket socket) throws IOException {
         this.socket = socket;
@@ -56,6 +61,10 @@ public class User{
     
     public void setName(String name) {
         this.name = name;
+    }
+
+    public void setChatRoomname(String chatRoomname) {
+        this.chatRoomname = chatRoomname;
     }
     
     public void closeInputStream() throws IOException{

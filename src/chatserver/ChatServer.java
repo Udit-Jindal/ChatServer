@@ -104,19 +104,20 @@ public class ChatServer {
                                 }
                                 else
                                 {
-                                    performAction(stringParser.getReturnCode());
+                                    performAction(stringParser.getReturnCode(),stringParser.parcedData.roomName);
                                 }
                             }
                             else{
                                 if(stringParser.inputFor.equalsIgnoreCase("ALL")){
-                                    writeToAllClients(line);
+                                    writeToAllClients(getRoomFromName(user.getChatRoomname()),line);
                                 }else{
-                                    User localUser = getUserFromName(stringParser.parcedData.userName);
+                                    ChatRoom chatRoom = getRoomFromName(user.getChatRoomname());
+                                    User localUser = getUserFromName(chatRoom,stringParser.parcedData.userName);
                                     writeToOneClient(localUser, line);
                                 }
                             }
                         }else{
-                            user.getOutputStream().println("#FROMSERVER DISCONNECTED");
+                            user.getOutputStream().println("#FROMSERVER EXIT DISCONNECTED");
                             break;
                         }
                     }
@@ -133,7 +134,7 @@ public class ChatServer {
             }
         }
         
-        public void performAction(int code){
+        public void performAction(int code,String roomName){
             
             switch(code){
                 case 001:{
@@ -145,58 +146,121 @@ public class ChatServer {
                 break;
                 
                 case 002:{
-                    //Show user list of current room.
+                    
+                    ChatRoom chatRoomRequested = getRoomFromName(user.getChatRoomname());
+                    if(chatRoomRequested != null){
+                        
+                        user.getOutputStream().println("#FROMSERVER"+ " "
+                                +"SHOWUSERLIST"
+                                + " "
+                                + "USERLIST"
+                                + " "
+                                + chatRoomRequested.userListString);
+                    }
                 }
                 break;
                 
                 case 003:{
-                    //Show user list in a particular room.
+                    
+                    ChatRoom chatRoomRequested = getRoomFromName(roomName);
+                    if(chatRoomRequested != null){
+                        
+                        user.getOutputStream().println("#FROMSERVER"+ " "
+                                +"SHOWUSERINROOMLIST"
+                                + " "
+                                + "USERLIST"
+                                + " "
+                                + chatRoomRequested.userListString);
+                    }
                 }
                 break;
                 
                 case 004:{
-                    //Connect to a room
+                    ChatRoom localChatRoom = getRoomFromName(roomName);
+                    if(localChatRoom != null){
+                        ChatRoom newChatRoom = new ChatRoom(user);
+                        chatRoomList.add(newChatRoom);
+                        user.setChatRoomname(roomName);
+                        user.getOutputStream().println("#FROMSERVER"+ " "
+                                +"NEWROOMCREATED"
+                                + " "
+                                + roomName
+                                + " "
+                                + "USERLIST"
+                                + " "
+                                + newChatRoom.userListString);
+                    }else{
+                        
+                        ChatRoom oldChatRoom = getRoomFromName(user.getChatRoomname());
+                        if(oldChatRoom != null){
+                            oldChatRoom.users.remove(user);
+                        }
+                        
+                        localChatRoom.users.add(user);
+                        user.setChatRoomname(localChatRoom.getName());
+                        localChatRoom.updateUserList();
+                        user.getOutputStream().println("#FROMSERVER"+ " "
+                                +"ROOMJOINED"
+                                + " "
+                                + localChatRoom.getName()
+                                + " "
+                                + "USERLIST"
+                                + " "
+                                + localChatRoom.userListString);
+                    }
                 }
                 break;
                 
                 case 005:{
-                    //Exit the room
+                    ChatRoom oldChatRoom = getRoomFromName(user.getChatRoomname());
+                    user.setChatRoomname(null);
+                    if(oldChatRoom != null){
+                        oldChatRoom.users.remove(user);
+                    }else{
+                        user.getOutputStream().println("#FROMSERVER"
+                                +" "
+                                +"EXITROOM"
+                                +" "
+                                +"ROOMDOESNOTEXISTS");
+                    }
                 }
                 break;
                 
                 default:
                 {
                     user.getOutputStream().println("#FROMSERVER"+" "+"WRONGINPUT");
+                    userList.remove(user);
                 }
             }
         }
         
-        public void writeToAllClients(String line){
+        public void writeToAllClients(ChatRoom chatRoom,String line){
             User localUser = null;
             try{
-                synchronized(userList){
-                    for(User userObj:userList){
+                synchronized(chatRoom.users){
+                    for(User userObj:chatRoom.users){
+                        localUser = userObj;
                         if(!userObj.equals(this.user)){
-                            userObj.getOutputStream().println(line);//try
+                            userObj.getOutputStream().println(this.user.getName()+":-"+line);//try
                         }
                     }
                 }
             }catch(NullPointerException ex){
                 System.out.println(localUser.getName()+" disconnected.");
-                userList.remove(localUser);
+                chatRoom.users.remove(localUser);
             }
             
         }
         
         public void writeToOneClient(User user,String line){
-            user.getOutputStream().println(line);
+            user.getOutputStream().println(this.user.getName()+":-"+line);
         }
         
-        public User getUserFromName(String name){
+        public User getUserFromName(ChatRoom chatRoom,String name){
             User localUser = null;
             try{
-                synchronized(userList){
-                    for(User userObj:userList){
+                synchronized(chatRoom.users){
+                    for(User userObj:chatRoom.users){
                         localUser = userObj;
                         if((localUser.getName()).equals(name)){
                             return localUser;
@@ -205,9 +269,29 @@ public class ChatServer {
                 }
             }catch(NullPointerException ex){
                 System.out.println(localUser.getName()+" disconnected.");
-                userList.remove(localUser);
+                chatRoom.users.remove(localUser);
             }
             return localUser;
         }
+        
+        public ChatRoom getRoomFromName(String name){
+            ChatRoom localChatRoom = null;
+            try{
+                synchronized(chatRoomList){
+                    for(ChatRoom chatRoomObj:chatRoomList){
+                        localChatRoom = chatRoomObj;
+                        if((localChatRoom.getName()).equals(name)){
+                            return localChatRoom;
+                        }
+                    }
+                }
+            }catch(NullPointerException ex){
+                System.out.println(localChatRoom.getName()+" disconnected.");
+                chatRoomList.remove(localChatRoom);
+            }
+            return localChatRoom;
+        }
+        
     }
+    
 }
