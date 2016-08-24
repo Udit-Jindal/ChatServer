@@ -48,11 +48,15 @@ public class ReadWriteStream extends Thread{
         try {
             while(true){
                 String line = _inputBufferedReader.readLine();
-                if(_isFromKeyboardToServer){
+                if(!_isFromKeyboardToServer){
                     if(line.contains("#")){
+//                        System.out.println("before split line from server:- "+line);
                         String[] tempArray = line.split(delimitor);
+//                        System.out.println("temp array:- "+tempArray);
                         tempArray[0] = "";
-                        line = Arrays.toString(tempArray);
+                        line = Arrays.asList(tempArray).toString();
+                        line = line.substring(1, line.length()-1).replaceAll(",", "");
+//                        System.out.println("after split line from server:- "+line);
                     }
                 }
                 this._outputPrintStream.println(line);

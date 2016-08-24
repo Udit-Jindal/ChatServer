@@ -72,7 +72,8 @@ public class StringParser {
         }else if(tempArray[0].contains("@")){
             inputFor = tempArray[0].replace("@", "");
             tempArray[0] = "";
-            returnString = Arrays.toString(tempArray);
+            returnString = Arrays.asList(tempArray).toString();
+            returnString = returnString.substring(1, returnString.length()-1).replaceAll(",", "");
         }
         else{
             this.returnString = input;
