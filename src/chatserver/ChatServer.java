@@ -73,7 +73,9 @@ public class ChatServer {
             synchronized(chatRoomList){
                 for(ChatRoom chatRoomObj:chatRoomList){
                     localChatRoom = chatRoomObj;
-                    if((localChatRoom.getName()).equals(name)){
+                    if((localChatRoom.getName()).equalsIgnoreCase(name)){
+                        System.out.println("localchatroomname:-"+localChatRoom.getName());
+                        System.out.println("\npassed name:-"+name);
                         return localChatRoom;
                     }
                 }
@@ -158,9 +160,9 @@ public class ChatServer {
                     }
                 }
             } catch (SocketException ex) {
-//                Logger.getLogger(User.class.getName()).log(Level.SEVERE, null, ex);
-userList.remove(user);
-updateUserListString();
+                
+                userList.remove(user);
+                updateUserListString();
             }catch(IOException ex){
                 Logger.getLogger(User.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -197,7 +199,7 @@ updateUserListString();
                 break;
                 
                 case 003:{
-                    
+                    System.out.println("room entered:-"+roomName);
                     ChatRoom chatRoomRequested = getRoomFromName(roomName);
                     if(chatRoomRequested != null){
                         
@@ -207,6 +209,11 @@ updateUserListString();
                                 + "USERLIST"
                                 + " "
                                 + chatRoomRequested.userListString);
+                    }else{
+                        user.getOutputStream().println("#FROMSERVER"+ " "
+                                +"SHOWUSERINROOMLIST"
+                                + " "
+                                + "NOROOMFOUND");
                     }
                 }
                 break;
@@ -215,9 +222,10 @@ updateUserListString();
                     ChatRoom localChatRoom = getRoomFromName(roomName);
                     if(localChatRoom == null){
                         ChatRoom newChatRoom = new ChatRoom(user);
+                        newChatRoom.setName(roomName);
                         chatRoomList.add(newChatRoom);
-                        updateRoomListString();
                         user.setChatRoomname(roomName);
+                        updateRoomListString();
                         user.getOutputStream().println("#FROMSERVER"+ " "
                                 +"NEWROOMCREATED"
                                 + " "
@@ -228,10 +236,6 @@ updateUserListString();
                                 + newChatRoom.userListString);
                     }else{
                         
-                        ChatRoom oldChatRoom = getRoomFromName(user.getChatRoomname());
-                        if(oldChatRoom != null){
-                            oldChatRoom.users.remove(user);
-                        }
                         
                         localChatRoom.users.add(user);
                         user.setChatRoomname(localChatRoom.getName());

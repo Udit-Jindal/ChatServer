@@ -31,10 +31,14 @@ public class ChatRoom {
     public String getName() {
         return name;
     }
+
+    public void setName(String name) {
+        this.name = name;
+    }
     
     public void updateUserList(){
         userListString = "";
-        int i = 0;
+        int i = 1;
         synchronized(users){
             for(User userObj:users){
                 userListString = userListString + i++
