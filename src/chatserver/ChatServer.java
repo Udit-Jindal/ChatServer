@@ -24,26 +24,21 @@ import user.User;
  */
 public class ChatServer {
     
-    static List<ChatRoom> chatRoomList;
-    static List<User> userList;
-    static Engine engine;
-    static ServerSocket serverSocket;
-    static Thread userListener;
-    static String chatRoomListString;
-    static String userListString;
+    List<ChatRoom> chatRoomList;
+    List<User> userList;
+    Engine engine;
+    ServerSocket serverSocket;
+    Thread userListener;
+    String chatRoomListString;
+    String userListString;
     
-    public ChatServer(){
-        try {
-            serverSocket = new ServerSocket(58000);
-            chatRoomList = new ArrayList<>();
-            userList = new ArrayList<>();
-        } catch (IOException ex) {
-            Logger.getLogger(ChatServer.class.getName()).log(Level.SEVERE, null, ex);
-        }
+    public ChatServer() throws IOException{
+        serverSocket = new ServerSocket(58000);
+        chatRoomList = new ArrayList<>();
+        userList = new ArrayList<>();
         
         userListener = new ChatServer.UserListener();
         userListener.start();
-        
     }
     
     private void updateRoomListString(){
@@ -128,7 +123,7 @@ public class ChatServer {
                     Socket socket= serverSocket.accept();
                     User user = new User(socket);
                     addUser(user);
-                    Thread userAction = new UserAction(user);
+                    Thread userAction = new UserProxy(user);
                     userAction.start();
                 } catch (IOException ex) {
                     System.out.println("IOException Occoured." + ex);
@@ -142,10 +137,10 @@ public class ChatServer {
         
     }
     
-    class UserAction extends Thread{
+    class UserProxy extends Thread{
         User user;
         
-        public UserAction(User user){
+        public UserProxy(User user){
             this.user = user;
         }
         
