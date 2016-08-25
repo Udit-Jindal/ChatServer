@@ -109,6 +109,8 @@ public class ChatServer {
                         System.out.println("localchatroomname:-"+localChatRoom.getName());
                         System.out.println("\npassed name:-"+name);
                         return localChatRoom;
+                    }else{
+                        localChatRoom = null;
                     }
                 }
             }
@@ -305,7 +307,7 @@ public class ChatServer {
                     for(User userObj:chatRoom.users){
                         localUser = userObj;
                         if(!userObj.equals(this.user)){
-                            userObj.getOutputStream().println(this.user.getName()+":-"+line);//try
+                            userObj.getOutputStream().println(this.user.getName()+":-"+line);
                         }
                     }
                 }

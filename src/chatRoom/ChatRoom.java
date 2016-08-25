@@ -35,10 +35,12 @@ public class ChatRoom {
     }
     
     public void addUser(User user){
+        users.add(user);
         updateUserList();
     }
     
     public void removeUser(User user){
+        users.remove(user);
         updateUserList();
     }
     
