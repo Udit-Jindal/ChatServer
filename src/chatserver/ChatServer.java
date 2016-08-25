@@ -106,8 +106,6 @@ public class ChatServer {
                 for(ChatRoom chatRoomObj:chatRoomList){
                     localChatRoom = chatRoomObj;
                     if((localChatRoom.getName()).equalsIgnoreCase(name)){
-                        System.out.println("localchatroomname:-"+localChatRoom.getName());
-                        System.out.println("\npassed name:-"+name);
                         return localChatRoom;
                     }else{
                         localChatRoom = null;
@@ -227,7 +225,6 @@ public class ChatServer {
                 break;
                 
                 case 003:{
-                    System.out.println("room entered:-"+roomName);
                     ChatRoom chatRoomRequested = getRoomFromName(roomName);
                     if(chatRoomRequested != null){
                         
@@ -263,7 +260,6 @@ public class ChatServer {
                                 + newChatRoom.userListString);
                     }else{
                         
-                        
                         localChatRoom.addUser(user);
                         user.setChatRoomname(localChatRoom.getName());
                         user.getOutputStream().println("#FROMSERVER"+ " "
@@ -274,6 +270,18 @@ public class ChatServer {
                                 + "USERLIST"
                                 + " "
                                 + localChatRoom.userListString);
+                        
+                        String line = "#FROMSERVER"+ " "
+                                +"USERJOINED"
+                                + " "
+                                + user.getName()
+                                + " "
+                                + "USERLIST"
+                                + " "
+                                + localChatRoom.userListString;
+                        
+                        writeToAllClients(localChatRoom, line);
+                        
                     }
                 }
                 break;

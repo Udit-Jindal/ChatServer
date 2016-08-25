@@ -50,7 +50,7 @@ public class ReadWriteStream extends Thread{
                 String line = _inputBufferedReader.readLine();
                 if(!_isFromKeyboardToServer){
                     if(line.contains("#")){
-//                        System.out.println("before split line from server:- "+line);
+
                         String[] tempArray = line.split(delimitor);
 //                        System.out.println("temp array:- "+tempArray);
                         tempArray[0] = "";
@@ -65,5 +65,6 @@ public class ReadWriteStream extends Thread{
             System.out.println("IOException"+ex);
         }
     }
+    
     
 }
