@@ -5,17 +5,20 @@
 */
 package chatRoom;
 
+import chatserver.ChatServer;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 import chatserver.ChatServer.UserProxy;
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 /**
  *
  * @author Raghu
  */
 public class ChatRoom {
-    public List<UserProxy> chatRoomUserList;
-    Socket socket;
+    List<UserProxy> chatRoomUserList;
     String name;
     
     public ChatRoom(String roomName){
@@ -26,11 +29,11 @@ public class ChatRoom {
     public String getName() {
         return name;
     }
-
+    
     public void setName(String name) {
         this.name = name;
     }
-       
+    
     public void removeUser(UserProxy user){
         synchronized(chatRoomUserList){
             chatRoomUserList.remove(user);
@@ -54,4 +57,15 @@ public class ChatRoom {
         }
         return userListString;
     }
+    
+    public void writeToAllUsers(UserProxy user,String messageFrom,String line){
+        synchronized(chatRoomUserList){
+            for(UserProxy userObj:chatRoomUserList){
+                if(!userObj.equals(user)){
+                    userObj.writeMessage(messageFrom+":-"+line);
+                }
+            }
+        }
+    }
+    
 }

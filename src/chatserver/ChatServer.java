@@ -33,9 +33,6 @@ public class ChatServer {
     Engine engine;
     ServerSocket serverSocket;
     Thread userListener;
-    ChatRoom chatRoom;
-//    String chatRoomListString;
-//    String userListString;
     
     String[] commandKeyWords = {"@SERVER"};
     
@@ -50,7 +47,7 @@ public class ChatServer {
     
     boolean isEmpty(String string){
         if(string.equals("")
-                || string==null
+                || (string==null)
                 || string.equalsIgnoreCase("null")
                 || string.equals("\\r\\n")){
             return true;
@@ -112,36 +109,25 @@ public class ChatServer {
     }
     
     public ChatRoom getRoomFromName(String name){
-        ChatRoom localChatRoom = null;
-        try{
-            synchronized(chatRoomList){
-                for(ChatRoom chatRoomObj:chatRoomList){
-                    localChatRoom = chatRoomObj;
-                    if((localChatRoom.getName()).equalsIgnoreCase(name)){
-                        return localChatRoom;
-                    }else{
-                        localChatRoom = null;
-                    }
+        synchronized(chatRoomList){
+            for(ChatRoom chatRoomObj:chatRoomList){
+                if((chatRoomObj.getName()).equalsIgnoreCase(name)){
+                    return chatRoomObj;
                 }
             }
-        }catch(NullPointerException ex){
-            System.out.println(localChatRoom.getName()+" disconnected.");
-            removeRoom(localChatRoom);
         }
-        return localChatRoom;
+        return null;
     }
     
     class UserListener extends Thread {
-        
-        Thread userAction;
         
         @Override
         public void run(){
             while(true){
                 try {
                     Socket socket= serverSocket.accept();
-                    userAction = new UserProxy(socket);
-                    addUser((UserProxy)userAction);
+                    UserProxy userAction = new UserProxy(socket);
+                    addUser(userAction);
                     userAction.start();
                 } catch (IOException ex) {
                     System.out.println("IOException Occoured." + ex);
@@ -159,50 +145,15 @@ public class ChatServer {
         
         BufferedReader inputStream;
         PrintStream outputStream;
-//        ChatRoom currentlyAssignedChatRooms;
         String userName;
         List<ChatRoom> userChatRoomList;
-        StringBuilder stringBuilder;
         static final String seperator = " ";
         static final String serverResponsePrefix = "#SERVER";
         
         public UserProxy(Socket socket) throws IOException{
-            this.setSocketStreams(socket);
+            this.inputStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            this.outputStream = new PrintStream(socket.getOutputStream());
             userChatRoomList = new ArrayList();
-        }
-        
-        public void setSocketStreams(Socket socket) throws IOException {
-            this.setStreams(socket.getInputStream(),socket.getOutputStream());
-        }
-        
-        public void setStreams(InputStream inputStream,OutputStream outputStream){
-            this.inputStream = new BufferedReader(new InputStreamReader(inputStream));
-            this.outputStream = new PrintStream(outputStream);
-        }
-        
-        public String getUserName() {
-            return userName;
-        }
-        
-        public BufferedReader getInputStream() {
-            return inputStream;
-        }
-        
-        public PrintStream getOutputStream() {
-            return outputStream;
-        }
-        
-        public void setUserName(String name) {
-            this.userName = name;
-        }
-        
-        
-        public void closeInputStream() throws IOException{
-            inputStream.close();
-        }
-        
-        public void closeOutputStream() throws IOException{
-            outputStream.close();
         }
         
         @Override
@@ -210,18 +161,136 @@ public class ChatServer {
             try{
                 while(true){
                     
-                    String line = (getInputStream().readLine()).trim();
+                    String line = (inputStream.readLine()).trim();
                     if(!isEmpty(line))
                     {
                         
-                        stringBuilder = new StringBuilder(line);
+                        StringBuilder stringBuilder = new StringBuilder(line);
                         
-                        String firstWord = getStartingWordOfInputString();
+                        String firstWord = getStartingWordOfInputString(stringBuilder);
                         if(checkIfCommand(firstWord)){
-                            processCommand();
+                            
+                            //<editor-fold defaultstate="collapsed" desc="Protocol code">
+                            
+                            String secondWord = getStartingWordOfInputString(stringBuilder);
+                            secondWord = secondWord.toUpperCase();
+                            switch(secondWord){
+                                
+                                case "ADDME":{
+                                    setName(getStartingWordOfInputString(stringBuilder));
+                                }
+                                break;
+                                
+                                case "SHOWROOMLIST":{
+                                    giveResponseToClient(new String[]{"ROOMLIST",getRoomListString()});
+                                }
+                                break;
+                                
+                                case "SHOWUSERLIST":{
+                                    giveResponseToClient(new String[]{"USERLIST",getUserListString()});
+                                }
+                                break;
+                                
+                                case "SHOWUSERINROOMLIST":{
+                                    String roomName = getStartingWordOfInputString(stringBuilder);
+                                    if(!isEmpty(roomName)){
+                                        
+                                        ChatRoom chatRoomRequested = getRoomFromName(roomName);
+                                        if(chatRoomRequested != null){
+                                            giveResponseToClient(new String[]{"USERLIST-IN-ROOM",chatRoomRequested.getUserListString()});
+                                        }else{
+                                            giveResponseToClient(new String[]{"USERLIST-IN-ROOM","ROOMNOTFOUND"});
+                                        }
+                                    }else{
+                                        giveResponseToClient(new String[]{"USERLIST-IN-ROOM","ROOMNAMEEMPTY"});
+                                        
+                                    }
+                                }
+                                break;
+                                
+                                case "CONNECTTOROOM":{
+                                    String roomName = getStartingWordOfInputString(stringBuilder);
+                                    if(!isEmpty(roomName)){
+                                        
+                                        ChatRoom chatRoomRequested = getRoomFromName(roomName);
+                                        if(chatRoomRequested == null){
+                                            // Create new room
+                                            
+                                            ChatRoom chatRoom = new ChatRoom(roomName);
+                                            chatRoom.addUser(this);
+                                            addRoom(chatRoom);
+                                            userChatRoomList.add(chatRoom);
+                                            giveResponseToClient(new String[]{"NEWROOMCREATED",roomName,"USERLIST-IN-ROOM",chatRoom.getUserListString()});
+                                        }else{
+                                            //Join room
+                                            
+                                            chatRoomRequested.addUser(this);
+                                            userChatRoomList.add(chatRoomRequested);
+                                            giveResponseToClient(new String[]{"ROOMJOINED",roomName,"USERLIST-IN-ROOM",chatRoomRequested.getUserListString()});
+                                            chatRoomRequested.writeToAllUsers(this,"#SERVER" ,"USERJOINED "+this.userName+" USERLIST-IN-ROOM "+chatRoomRequested.getUserListString());
+                                            
+                                        }
+                                    }else{
+                                        giveResponseToClient(new String[]{"CONNECTTOROOM","ROOMNAMEEMPTY"});
+                                    }
+                                }
+                                break;
+                                
+                                case "EXITROOM":{
+                                    String roomName = getStartingWordOfInputString(stringBuilder);
+                                    if(!isEmpty(roomName)){
+                                        ChatRoom chatRoomRequested = checkIfRoomExistsInUserList(roomName);
+                                        if(chatRoomRequested != null){
+                                            chatRoomRequested.removeUser(this);
+                                            this.userChatRoomList.remove(chatRoomRequested);
+                                            giveResponseToClient(new String[]{"USERLIST-IN-ROOM",chatRoomRequested.getUserListString()});
+                                            
+                                        }else{
+                                            giveResponseToClient(new String[]{"EXITROOM","ROOMNOTFOUND"});
+                                        }
+                                    }else{
+                                        giveResponseToClient(new String[]{"EXITROOM","ROOMNAMEEMPTY"});
+                                    }
+                                }
+                                break;
+                                
+                                case "EXIT":{
+                                    giveResponseToClient(new String[]{"EXITROOM","DISCONNECTED"});
+                                    this.inputStream.close();
+                                    this.outputStream.close();
+                                }
+                                break;
+                                
+                                default:
+                                {
+                                    giveResponseToClient(new String[]{"WRONGINPUT"});
+                                }
+                            }
+                            
+                            //</editor-fold>
+                            
                         }
                         else{
-                            sendChat(firstWord);
+                            //<editor-fold defaultstate="collapsed" desc="Sending chat to user">
+                            if(firstWord.contains("@")){
+                                firstWord = firstWord.replace("@", "");
+                            }
+                            
+                            if(!isEmpty(firstWord)){
+                                
+                                ChatRoom requestedChatRoom = checkIfRoomExistsInUserList(firstWord);
+                                
+                                if(requestedChatRoom!=null)
+                                {
+                                    requestedChatRoom.writeToAllUsers(this,userName,stringBuilder.toString());
+                                }
+                                else{
+                                    giveResponseToClient(new String[]{"CHAT","ROOMNOTFOUND"});
+                                }
+                            }else{
+                                giveResponseToClient(new String[]{"CHAT","ROOMNAMEEMPTY"});
+                            }
+                            //</editor-fold>
                         }
                         
                         
@@ -235,15 +304,19 @@ public class ChatServer {
             }
             finally{
                 try {
-                    this.closeInputStream();
-                    this.closeOutputStream();
+                    inputStream.close();
+                    outputStream.close();
                 } catch (Exception ex) {
                     System.out.println("Un-able to close the streams.");
                 }
             }
         }
         
-        public String getStartingWordOfInputString() throws StringIndexOutOfBoundsException,NullPointerException{
+        public void writeMessage(String data){
+            outputStream.println(data);
+        }
+        
+        public String getStartingWordOfInputString(StringBuilder stringBuilder) throws StringIndexOutOfBoundsException,NullPointerException{
             
             int indexofFirstSpace = stringBuilder.indexOf(" ");
             
@@ -271,132 +344,6 @@ public class ChatServer {
             }
         }
         
-        void processCommand() throws IOException{
-            
-            String secondWord = getStartingWordOfInputString();
-            secondWord = secondWord.toUpperCase();
-            switch(secondWord){
-                
-                case "ADDME":{
-                    setName(getStartingWordOfInputString());
-                }
-                break;
-                
-                case "SHOWROOMLIST":{
-                    giveResponseToClient(new String[]{"ROOMLIST",getRoomListString()});
-                }
-                break;
-                
-                case "SHOWUSERLIST":{
-                    giveResponseToClient(new String[]{"USERLIST",getUserListString()});
-                }
-                break;
-                
-                case "SHOWUSERINROOMLIST":{
-                    String roomName = getStartingWordOfInputString();
-                    if(!isEmpty(roomName)){
-                        
-                        ChatRoom chatRoomRequested = getRoomFromName(roomName);
-                        if(chatRoomRequested != null){
-                            giveResponseToClient(new String[]{"USERLIST-IN-ROOM",chatRoomRequested.getUserListString()});
-                        }else{
-                            giveResponseToClient(new String[]{"USERLIST-IN-ROOM","ROOMNOTFOUND"});
-                        }
-                    }else{
-                        giveResponseToClient(new String[]{"USERLIST-IN-ROOM","ROOMNAMEEMPTY"});
-                        
-                    }
-                }
-                break;
-                
-                case "CONNECTTOROOM":{
-                    String roomName = getStartingWordOfInputString();
-                    if(!isEmpty(roomName)){
-                        
-                        ChatRoom chatRoomRequested = getRoomFromName(roomName);
-                        if(chatRoomRequested == null){
-                            // Create new room
-                            
-                            chatRoom = new ChatRoom(roomName);
-                            chatRoom.addUser(this);
-                            addRoom(chatRoom);
-                            userChatRoomList.add(chatRoom);
-                            giveResponseToClient(new String[]{"NEWROOMCREATED",roomName,"USERLIST-IN-ROOM",chatRoom.getUserListString()});
-                        }else{
-                            //Join room
-                            
-                            chatRoomRequested.addUser(this);
-                            userChatRoomList.add(chatRoomRequested);
-                            giveResponseToClient(new String[]{"ROOMJOINED",roomName,"USERLIST-IN-ROOM",chatRoom.getUserListString()});
-                            writeToAllClientsOfRoom(chatRoomRequested,"#SERVER" ,"USERJOINED "+this.getUserName()+" USERLIST-IN-ROOM "+chatRoom.getUserListString());
-                            
-                        }
-                    }else{
-                        giveResponseToClient(new String[]{"CONNECTTOROOM","ROOMNAMEEMPTY"});
-                    }
-                }
-                break;
-                
-                case "EXITROOM":{
-                    String roomName = getStartingWordOfInputString();
-                    if(!isEmpty(roomName)){
-                        ChatRoom chatRoomRequested = getRoomFromName(roomName);
-                        if(chatRoomRequested != null){
-                            //Check if user is in that room.
-                            
-                            if(chatRoomRequested.chatRoomUserList.contains(this)){
-                                chatRoomRequested.removeUser(this);
-                                this.userChatRoomList.remove(chatRoomRequested);
-                                giveResponseToClient(new String[]{"USERLIST-IN-ROOM",chatRoomRequested.getUserListString()});
-                            }else{
-                                giveResponseToClient(new String[]{"USERNOTINROOM"});
-                            }
-                            
-                        }else{
-                            giveResponseToClient(new String[]{"EXITROOM","ROOMNOTFOUND"});
-                        }
-                    }else{
-                        giveResponseToClient(new String[]{"EXITROOM","ROOMNAMEEMPTY"});
-                    }
-                }
-                break;
-                
-                case "EXIT":{
-                    giveResponseToClient(new String[]{"EXITROOM","DISCONNECTED"});
-                    this.inputStream.close();
-                    this.outputStream.close();
-                }
-                break;
-                
-                default:
-                {
-                    giveResponseToClient(new String[]{"WRONGINPUT"});
-                }
-            }
-        }
-        
-        void sendChat(String roomName){
-            if(roomName.contains("@")){
-                roomName = roomName.replace("@", "");
-            }
-            
-            if(!isEmpty(roomName)){
-                
-                ChatRoom requestedChatRoom = getRoomFromName(roomName);
-                
-                if(requestedChatRoom!=null)
-                {
-                    if(requestedChatRoom.chatRoomUserList.contains(this))
-                        writeToAllClientsOfRoom(requestedChatRoom,this.getUserName(),stringBuilder.toString());
-                }
-                else{
-                    giveResponseToClient(new String[]{"CHAT","ROOMNOTFOUND"});
-                }
-            }else{
-                giveResponseToClient(new String[]{"CHAT","ROOMNAMEEMPTY"});
-            }
-        }
-        
         void giveResponseToClient(String[] data){
             
             StringBuilder sb = new StringBuilder(serverResponsePrefix);
@@ -405,33 +352,18 @@ public class ChatServer {
                 sb.append(seperator).append(s);
             }
             
-            getOutputStream().println(sb.toString());
+            outputStream.println(sb.toString());
         }
-        
-        public void writeToAllClientsOfRoom(ChatRoom chatRoom,String messageFrom,String line){
-            UserProxy localUser = null;
-            try{
-                synchronized(chatRoom.chatRoomUserList){
-                    for(UserProxy userObj:chatRoom.chatRoomUserList){
-                        localUser = userObj;
-                        if(!userObj.equals(this)){
-                            userObj.getOutputStream().println(messageFrom+":-"+line);
-                        }
-                    }
-                }
-            }catch(NullPointerException ex){
-                System.out.println(localUser.getUserName()+" disconnected.");
-                chatRoom.removeUser(localUser);
-                removeUser(this);
-                try {
-                    this.inputStream.close();
-                    this.outputStream.close();
-                } catch (IOException ex1) {
-                    Logger.getLogger(ChatServer.class.getName()).log(Level.SEVERE, null, ex1);
+       
+        ChatRoom checkIfRoomExistsInUserList(String roomName){
+            for(ChatRoom chtrm:userChatRoomList){
+                if(chtrm.getName().equalsIgnoreCase(roomName)){
+                    return chtrm;
                 }
             }
+            return null;
         }
         
     }
-        
+    
 }
