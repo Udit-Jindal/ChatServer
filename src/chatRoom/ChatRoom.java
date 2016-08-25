@@ -8,22 +8,19 @@ package chatRoom;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
-import user.User;
-
+import chatserver.ChatServer.UserProxy;
 /**
  *
  * @author Raghu
  */
 public class ChatRoom {
-    public List<User> users;
+    public List<UserProxy> chatRoomUserList;
     Socket socket;
     String name;
-    public String userListString;
     
-    public ChatRoom(User user){
-        users = new ArrayList();
-        users.add(user);
-        updateUserList();
+    public ChatRoom(String roomName){
+        chatRoomUserList = new ArrayList();
+        this.name = roomName;
     }
     
     public String getName() {
@@ -33,25 +30,28 @@ public class ChatRoom {
     public void setName(String name) {
         this.name = name;
     }
-    
-    public void addUser(User user){
-        users.add(user);
-        updateUserList();
+       
+    public void removeUser(UserProxy user){
+        synchronized(chatRoomUserList){
+            chatRoomUserList.remove(user);
+        }
     }
     
-    public void removeUser(User user){
-        users.remove(user);
-        updateUserList();
+    public void addUser(UserProxy user){
+        synchronized(chatRoomUserList){
+            chatRoomUserList.add(user);
+        }
     }
     
-    public void updateUserList(){
-        userListString = "";
+    public String getUserListString(){
+        String userListString = "";
         int i = 1;
-        synchronized(users){
-            for(User userObj:users){
+        synchronized(chatRoomUserList){
+            for(UserProxy userObj:chatRoomUserList){
                 userListString = userListString + i++
                         +". " +userObj.getName()+"\n";
             }
         }
+        return userListString;
     }
 }

@@ -5,18 +5,22 @@
 */
 package chatserver;
 
-import chatEngine.StringParser;
 import chatRoom.ChatRoom;
 import com.sun.xml.internal.ws.api.pipe.Engine;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import user.User;
 
 /**
  *
@@ -25,24 +29,27 @@ import user.User;
 public class ChatServer {
     
     List<ChatRoom> chatRoomList;
-    List<User> userList;
+    List<UserProxy> userProxyList;
     Engine engine;
     ServerSocket serverSocket;
     Thread userListener;
-    String chatRoomListString;
-    String userListString;
+    ChatRoom chatRoom;
+//    String chatRoomListString;
+//    String userListString;
+    
+    String[] commandKeyWords = {"@SERVER"};
     
     public ChatServer() throws IOException{
         serverSocket = new ServerSocket(58000);
         chatRoomList = new ArrayList<>();
-        userList = new ArrayList<>();
+        userProxyList = new ArrayList<>();
         
         userListener = new ChatServer.UserListener();
         userListener.start();
     }
     
-    private void updateRoomListString(){
-        chatRoomListString = "";
+    private String getRoomListString(){
+        String chatRoomListString = "";
         int i = 1;
         synchronized(chatRoomList){
             for(ChatRoom rm:chatRoomList){
@@ -50,24 +57,25 @@ public class ChatServer {
                         +". " +rm.getName()+"\n";
             }
         }
+        return chatRoomListString;
     }
     
-    private void updateUserListString(){
-        userListString = "";
+    private String getUserListString(){
+        String userListString = "";
         int i = 1;
-        synchronized(userList){
-            for(User us:userList){
+        synchronized(userProxyList){
+            for(UserProxy us:userProxyList){
                 userListString = userListString + "\n"+i++
                         +". " +us.getName()+"\n";
             }
         }
+        return userListString;
     }
     
-    private void addUser(User user){
-        synchronized(userList)
+    private void addUser(UserProxy userProxy){
+        synchronized(userProxyList)
         {
-            userList.add(user);
-            updateUserListString();
+            userProxyList.add(userProxy);
         }
     }
     
@@ -75,15 +83,13 @@ public class ChatServer {
         synchronized(chatRoomList)
         {
             chatRoomList.add(chatRoom);
-            updateRoomListString();
         }
     }
     
-    private void removeUser(User user){
-        synchronized(userList)
+    private void removeUser(UserProxy user){
+        synchronized(userProxyList)
         {
-            userList.remove(user);
-            updateUserListString();
+            userProxyList.remove(user);
         }
     }
     
@@ -91,7 +97,6 @@ public class ChatServer {
         synchronized(chatRoomList)
         {
             chatRoomList.remove(chatRoom);
-            updateRoomListString();
         }
     }
     public ChatRoom getRoomFromName(String name){
@@ -116,14 +121,15 @@ public class ChatServer {
     
     class UserListener extends Thread {
         
+        Thread userAction;
+        
         @Override
         public void run(){
             while(true){
                 try {
                     Socket socket= serverSocket.accept();
-                    User user = new User(socket);
-                    addUser(user);
-                    Thread userAction = new UserProxy(user);
+                    userAction = new UserProxy(socket);
+                    addUser((UserProxy)userAction);
                     userAction.start();
                 } catch (IOException ex) {
                     System.out.println("IOException Occoured." + ex);
@@ -137,212 +143,294 @@ public class ChatServer {
         
     }
     
-    class UserProxy extends Thread{
-        User user;
+    public class UserProxy extends Thread{
         
-        public UserProxy(User user){
-            this.user = user;
+        BufferedReader inputStream;
+        PrintStream outputStream;
+//        ChatRoom currentlyAssignedChatRooms;
+        String userName;
+        List<ChatRoom> userChatRoomList;
+        StringBuilder stringBuilder;
+        static final String seperator = " ";
+        static final String serverResponsePrefix = "#SERVER";
+        
+        public UserProxy(Socket socket) throws IOException{
+            this.setSocketStreams(socket);
+            userChatRoomList = new ArrayList();
+        }
+        
+        public void setSocketStreams(Socket socket) throws IOException {
+            this.setStreams(socket.getInputStream(),socket.getOutputStream());
+        }
+        
+        public void setStreams(InputStream inputStream,OutputStream outputStream){
+            this.inputStream = new BufferedReader(new InputStreamReader(inputStream));
+            this.outputStream = new PrintStream(outputStream);
+        }
+        
+        public String getUserName() {
+            return userName;
+        }
+        
+        public BufferedReader getInputStream() {
+            return inputStream;
+        }
+        
+        public PrintStream getOutputStream() {
+            return outputStream;
+        }
+        
+        public void setUserName(String name) {
+            this.userName = name;
+        }
+        
+        
+        public void closeInputStream() throws IOException{
+            inputStream.close();
+        }
+        
+        public void closeOutputStream() throws IOException{
+            outputStream.close();
         }
         
         @Override
         public void run(){
-            String line;
             try{
                 while(true){
-                    StringParser stringParser = new StringParser();
-                    line = user.getInputStream().readLine();
-                    if(!line.isEmpty())
+                    
+                    String line = (getInputStream().readLine()).trim();
+                    if(!isEmpty(line))
                     {
-                        stringParser.processInput(line);
-                        if(stringParser.getReturnCode() != 111){
-                            if(stringParser.isCommand){
-                                if(stringParser.getReturnCode()==000){
-                                    user.setName(stringParser.parcedData.userName);
-                                    updateUserListString();
-                                }
-                                else
-                                {
-                                    performAction(stringParser.getReturnCode(),stringParser.parcedData.roomName);
-                                }
-                            }
-                            else{
-                                if(stringParser.inputFor.equalsIgnoreCase("ALL")){
-                                    writeToAllClients(getRoomFromName(user.getChatRoomname()),line);
-                                }else{
-                                    ChatRoom chatRoom = getRoomFromName(user.getChatRoomname());
-                                    User localUser = getUserFromName(chatRoom,stringParser.parcedData.userName);
-                                    writeToOneClient(localUser, line);
-                                }
-                            }
-                        }else{
-                            user.getOutputStream().println("#FROMSERVER EXIT DISCONNECTED");
-                            removeUser(user);
-                            break;
+                        
+                        stringBuilder = new StringBuilder(line);
+                        
+                        String firstWord = getStartingWordOfInputString();
+                        if(checkIfCommand(firstWord)){
+                            processCommand();
                         }
+                        else{
+                            sendChat(firstWord);
+                        }
+                        
+                        
                     }
                 }
             } catch (SocketException ex) {
                 
-                removeUser(user);
+                removeUser(this);
             }catch(IOException ex){
-                Logger.getLogger(User.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(this.getName()).log(Level.SEVERE, null, ex);
             }
             finally{
                 try {
-                    user.closeInputStream();
-                    user.closeOutputStream();
+                    this.closeInputStream();
+                    this.closeOutputStream();
                 } catch (Exception ex) {
                     System.out.println("Un-able to close the streams.");
                 }
             }
         }
         
-        public void performAction(int code,String roomName){
+        public String getStartingWordOfInputString() throws StringIndexOutOfBoundsException,NullPointerException{
             
-            switch(code){
-                case 001:{
-                    user.getOutputStream().println("#FROMSERVER"+" "
-                            +"ROOMLIST"
-                            +" "
-                            +chatRoomListString);
+            int indexofFirstSpace = stringBuilder.indexOf(" ");
+            
+            if(indexofFirstSpace>0)
+            {
+                String firstWord = (String) stringBuilder.subSequence(0, indexofFirstSpace);
+                
+                stringBuilder.delete(0, indexofFirstSpace+1);
+                
+                return firstWord;
+            }
+            else{
+                String str = stringBuilder.toString();
+                stringBuilder.delete(0, stringBuilder.length());
+                return str;
+            }
+        }
+        
+        boolean checkIfCommand(String firstWord){
+            
+            if(Arrays.asList(commandKeyWords).contains(firstWord)){
+                return true;
+            }else{
+                return false;
+            }
+        }
+        
+        void processCommand() throws IOException{
+            
+            String secondWord = getStartingWordOfInputString();
+            secondWord = secondWord.toUpperCase();
+            switch(secondWord){
+                
+                case "ADDME":{
+                    setName(getStartingWordOfInputString());
                 }
                 break;
                 
-                case 002:{
-                    
-                    user.getOutputStream().println("#FROMSERVER"+ " "
-                            +"SHOWUSERLIST"
-                            + " "
-                            + "USERLIST"
-                            + " "
-                            + userListString);
+                case "SHOWROOMLIST":{
+                    giveResponseToClient(new String[]{"ROOMLIST",getRoomListString()});
                 }
                 break;
                 
-                case 003:{
-                    ChatRoom chatRoomRequested = getRoomFromName(roomName);
-                    if(chatRoomRequested != null){
+                case "SHOWUSERLIST":{
+                    giveResponseToClient(new String[]{"USERLIST",getUserListString()});
+                }
+                break;
+                
+                case "SHOWUSERINROOMLIST":{
+                    String roomName = getStartingWordOfInputString();
+                    if(!isEmpty(roomName)){
                         
-                        user.getOutputStream().println("#FROMSERVER"+ " "
-                                +"SHOWUSERINROOMLIST"
-                                + " "
-                                + "USERLIST"
-                                + " "
-                                + chatRoomRequested.userListString);
+                        ChatRoom chatRoomRequested = getRoomFromName(roomName);
+                        if(chatRoomRequested != null){
+                            giveResponseToClient(new String[]{"USERLIST-IN-ROOM",chatRoomRequested.getUserListString()});
+                        }else{
+                            giveResponseToClient(new String[]{"USERLIST-IN-ROOM","ROOMNOTFOUND"});
+                        }
                     }else{
-                        user.getOutputStream().println("#FROMSERVER"+ " "
-                                +"SHOWUSERINROOMLIST"
-                                + " "
-                                + "NOROOMFOUND");
-                    }
-                }
-                break;
-                
-                case 004:{
-                    ChatRoom localChatRoom = getRoomFromName(roomName);
-                    if(localChatRoom == null){
-                        ChatRoom newChatRoom = new ChatRoom(user);
-                        newChatRoom.setName(roomName);
-                        addRoom(newChatRoom);
-                        user.setChatRoomname(roomName);
-                        user.getOutputStream().println("#FROMSERVER"+ " "
-                                +"NEWROOMCREATED"
-                                + " "
-                                + roomName
-                                + " "
-                                + "USERLIST"
-                                + " "
-                                + newChatRoom.userListString);
-                    }else{
-                        
-                        localChatRoom.addUser(user);
-                        user.setChatRoomname(localChatRoom.getName());
-                        user.getOutputStream().println("#FROMSERVER"+ " "
-                                +"ROOMJOINED"
-                                + " "
-                                + localChatRoom.getName()
-                                + " "
-                                + "USERLIST"
-                                + " "
-                                + localChatRoom.userListString);
-                        
-                        String line = "#FROMSERVER"+ " "
-                                +"USERJOINED"
-                                + " "
-                                + user.getName()
-                                + " "
-                                + "USERLIST"
-                                + " "
-                                + localChatRoom.userListString;
-                        
-                        writeToAllClients(localChatRoom, line);
+                        giveResponseToClient(new String[]{"USERLIST-IN-ROOM","ROOMNAMEEMPTY"});
                         
                     }
                 }
                 break;
                 
-                case 005:{
-                    ChatRoom oldChatRoom = getRoomFromName(user.getChatRoomname());
-                    user.setChatRoomname(null);
-                    if(oldChatRoom != null){
-                        oldChatRoom.removeUser(user);
+                case "CONNECTTOROOM":{
+                    String roomName = getStartingWordOfInputString();
+                    if(!isEmpty(roomName)){
+                        
+                        ChatRoom chatRoomRequested = getRoomFromName(roomName);
+                        if(chatRoomRequested == null){
+                            // Create new room
+                            
+                            chatRoom = new ChatRoom(roomName);
+                            chatRoom.addUser(this);
+                            addRoom(chatRoom);
+                            userChatRoomList.add(chatRoom);
+                            giveResponseToClient(new String[]{"NEWROOMCREATED",roomName,"USERLIST-IN-ROOM",chatRoom.getUserListString()});
+                        }else{
+                            //Join room
+                            
+                            chatRoomRequested.addUser(this);
+                            userChatRoomList.add(chatRoomRequested);
+                            giveResponseToClient(new String[]{"ROOMJOINED",roomName,"USERLIST-IN-ROOM",chatRoom.getUserListString()});
+                            writeToAllClientsOfRoom(chatRoomRequested,"#SERVER" ,"USERJOINED "+this.getUserName()+" USERLIST-IN-ROOM "+chatRoom.getUserListString());
+                            
+                        }
                     }else{
-                        user.getOutputStream().println("#FROMSERVER"
-                                +" "
-                                +"EXITROOM"
-                                +" "
-                                +"ROOMDOESNOTEXISTS");
+                        giveResponseToClient(new String[]{"CONNECTTOROOM","ROOMNAMEEMPTY"});
                     }
+                }
+                break;
+                
+                case "EXITROOM":{
+                    String roomName = getStartingWordOfInputString();
+                    if(!isEmpty(roomName)){
+                        ChatRoom chatRoomRequested = getRoomFromName(roomName);
+                        if(chatRoomRequested != null){
+                            //Check if user is in that room.
+                            
+                            if(chatRoomRequested.chatRoomUserList.contains(this)){
+                                chatRoomRequested.removeUser(this);
+                                this.userChatRoomList.remove(chatRoomRequested);
+                                giveResponseToClient(new String[]{"USERLIST-IN-ROOM",chatRoomRequested.getUserListString()});
+                            }else{
+                                giveResponseToClient(new String[]{"USERNOTINROOM"});
+                            }
+                            
+                        }else{
+                            giveResponseToClient(new String[]{"EXITROOM","ROOMNOTFOUND"});
+                        }
+                    }else{
+                        giveResponseToClient(new String[]{"EXITROOM","ROOMNAMEEMPTY"});
+                    }
+                }
+                break;
+                
+                case "EXIT":{
+                    giveResponseToClient(new String[]{"EXITROOM","DISCONNECTED"});
+                    this.inputStream.close();
+                    this.outputStream.close();
                 }
                 break;
                 
                 default:
                 {
-                    user.getOutputStream().println("#FROMSERVER"+" "+"WRONGINPUT");
+                    giveResponseToClient(new String[]{"WRONGINPUT"});
                 }
             }
         }
         
-        public void writeToAllClients(ChatRoom chatRoom,String line){
-            User localUser = null;
-            try{
-                synchronized(chatRoom.users){
-                    for(User userObj:chatRoom.users){
-                        localUser = userObj;
-                        if(!userObj.equals(this.user)){
-                            userObj.getOutputStream().println(this.user.getName()+":-"+line);
-                        }
-                    }
-                }
-            }catch(NullPointerException ex){
-                System.out.println(localUser.getName()+" disconnected.");
-                chatRoom.removeUser(localUser);
+        void sendChat(String roomName){
+            if(roomName.contains("@")){
+                roomName = roomName.replace("@", "");
             }
             
+            if(!isEmpty(roomName)){
+                
+                ChatRoom requestedChatRoom = getRoomFromName(roomName);
+                
+                if(requestedChatRoom!=null)
+                {
+                    if(requestedChatRoom.chatRoomUserList.contains(this))
+                        writeToAllClientsOfRoom(requestedChatRoom,this.getUserName(),stringBuilder.toString());
+                }
+                else{
+                    giveResponseToClient(new String[]{"CHAT","ROOMNOTFOUND"});
+                }
+            }else{
+                giveResponseToClient(new String[]{"CHAT","ROOMNAMEEMPTY"});
+            }
         }
         
-        public void writeToOneClient(User user,String line){
-            user.getOutputStream().println(this.user.getName()+":-"+line);
+        void giveResponseToClient(String[] data){
+            
+            StringBuilder sb = new StringBuilder(serverResponsePrefix);
+            
+            for(String s:data){
+                sb.append(seperator).append(s);
+            }
+            
+            getOutputStream().println(sb.toString());
         }
         
-        public User getUserFromName(ChatRoom chatRoom,String name){
-            User localUser = null;
+        public void writeToAllClientsOfRoom(ChatRoom chatRoom,String messageFrom,String line){
+            UserProxy localUser = null;
             try{
-                synchronized(chatRoom.users){
-                    for(User userObj:chatRoom.users){
+                synchronized(chatRoom.chatRoomUserList){
+                    for(UserProxy userObj:chatRoom.chatRoomUserList){
                         localUser = userObj;
-                        if((localUser.getName()).equals(name)){
-                            return localUser;
+                        if(!userObj.equals(this)){
+                            userObj.getOutputStream().println(messageFrom+":-"+line);
                         }
                     }
                 }
             }catch(NullPointerException ex){
-                System.out.println(localUser.getName()+" disconnected.");
+                System.out.println(localUser.getUserName()+" disconnected.");
                 chatRoom.removeUser(localUser);
+                removeUser(this);
+                try {
+                    this.inputStream.close();
+                    this.outputStream.close();
+                } catch (IOException ex1) {
+                    Logger.getLogger(ChatServer.class.getName()).log(Level.SEVERE, null, ex1);
+                }
             }
-            return localUser;
         }
         
+    }
+    
+    boolean isEmpty(String string){
+        if(string.equals("")
+                || string==null
+                || string.equalsIgnoreCase("null")
+                || string.equals("\\r\\n")){
+            return true;
+        }else{
+            return false;
+        }
     }
     
 }
