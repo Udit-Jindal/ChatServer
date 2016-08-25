@@ -5,8 +5,6 @@
 */
 package chatRoom;
 
-import java.io.IOException;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +32,14 @@ public class ChatRoom {
 
     public void setName(String name) {
         this.name = name;
+    }
+    
+    public void addUser(User user){
+        updateUserList();
+    }
+    
+    public void removeUser(User user){
+        updateUserList();
     }
     
     public void updateUserList(){

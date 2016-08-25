@@ -43,6 +43,7 @@ public class ChatServer {
         
         userListener = new ChatServer.UserListener();
         userListener.start();
+        
     }
     
     private void updateRoomListString(){
@@ -67,6 +68,37 @@ public class ChatServer {
         }
     }
     
+    private void addUser(User user){
+        synchronized(userList)
+        {
+            userList.add(user);
+            updateUserListString();
+        }
+    }
+    
+    private void addRoom(ChatRoom chatRoom){
+        synchronized(chatRoomList)
+        {
+            chatRoomList.add(chatRoom);
+            updateRoomListString();
+        }
+    }
+    
+    private void removeUser(User user){
+        synchronized(userList)
+        {
+            userList.remove(user);
+            updateUserListString();
+        }
+    }
+    
+    private void removeRoom(ChatRoom chatRoom){
+        synchronized(chatRoomList)
+        {
+            chatRoomList.remove(chatRoom);
+            updateRoomListString();
+        }
+    }
     public ChatRoom getRoomFromName(String name){
         ChatRoom localChatRoom = null;
         try{
@@ -82,7 +114,7 @@ public class ChatServer {
             }
         }catch(NullPointerException ex){
             System.out.println(localChatRoom.getName()+" disconnected.");
-            chatRoomList.remove(localChatRoom);
+            removeRoom(localChatRoom);
         }
         return localChatRoom;
     }
@@ -95,11 +127,7 @@ public class ChatServer {
                 try {
                     Socket socket= serverSocket.accept();
                     User user = new User(socket);
-                    synchronized(userList)
-                    {
-                        userList.add(user);
-                        updateUserListString();
-                    }
+                    addUser(user);
                     Thread userAction = new UserAction(user);
                     userAction.start();
                 } catch (IOException ex) {
@@ -153,16 +181,14 @@ public class ChatServer {
                             }
                         }else{
                             user.getOutputStream().println("#FROMSERVER EXIT DISCONNECTED");
-                            userList.remove(user);
-                            updateUserListString();
+                            removeUser(user);
                             break;
                         }
                     }
                 }
             } catch (SocketException ex) {
                 
-                userList.remove(user);
-                updateUserListString();
+                removeUser(user);
             }catch(IOException ex){
                 Logger.getLogger(User.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -223,9 +249,8 @@ public class ChatServer {
                     if(localChatRoom == null){
                         ChatRoom newChatRoom = new ChatRoom(user);
                         newChatRoom.setName(roomName);
-                        chatRoomList.add(newChatRoom);
+                        addRoom(newChatRoom);
                         user.setChatRoomname(roomName);
-                        updateRoomListString();
                         user.getOutputStream().println("#FROMSERVER"+ " "
                                 +"NEWROOMCREATED"
                                 + " "
@@ -237,9 +262,8 @@ public class ChatServer {
                     }else{
                         
                         
-                        localChatRoom.users.add(user);
+                        localChatRoom.addUser(user);
                         user.setChatRoomname(localChatRoom.getName());
-                        localChatRoom.updateUserList();
                         user.getOutputStream().println("#FROMSERVER"+ " "
                                 +"ROOMJOINED"
                                 + " "
@@ -256,7 +280,7 @@ public class ChatServer {
                     ChatRoom oldChatRoom = getRoomFromName(user.getChatRoomname());
                     user.setChatRoomname(null);
                     if(oldChatRoom != null){
-                        oldChatRoom.users.remove(user);
+                        oldChatRoom.removeUser(user);
                     }else{
                         user.getOutputStream().println("#FROMSERVER"
                                 +" "
@@ -287,7 +311,7 @@ public class ChatServer {
                 }
             }catch(NullPointerException ex){
                 System.out.println(localUser.getName()+" disconnected.");
-                chatRoom.users.remove(localUser);
+                chatRoom.removeUser(localUser);
             }
             
         }
@@ -309,7 +333,7 @@ public class ChatServer {
                 }
             }catch(NullPointerException ex){
                 System.out.println(localUser.getName()+" disconnected.");
-                chatRoom.users.remove(localUser);
+                chatRoom.removeUser(localUser);
             }
             return localUser;
         }
