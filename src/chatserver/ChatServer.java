@@ -48,7 +48,18 @@ public class ChatServer {
         userListener.start();
     }
     
-    private String getRoomListString(){
+    boolean isEmpty(String string){
+        if(string.equals("")
+                || string==null
+                || string.equalsIgnoreCase("null")
+                || string.equals("\\r\\n")){
+            return true;
+        }else{
+            return false;
+        }
+    }
+    
+    String getRoomListString(){
         String chatRoomListString = "";
         int i = 1;
         synchronized(chatRoomList){
@@ -60,7 +71,7 @@ public class ChatServer {
         return chatRoomListString;
     }
     
-    private String getUserListString(){
+    String getUserListString(){
         String userListString = "";
         int i = 1;
         synchronized(userProxyList){
@@ -72,33 +83,34 @@ public class ChatServer {
         return userListString;
     }
     
-    private void addUser(UserProxy userProxy){
+    void addUser(UserProxy userProxy){
         synchronized(userProxyList)
         {
             userProxyList.add(userProxy);
         }
     }
     
-    private void addRoom(ChatRoom chatRoom){
+    void addRoom(ChatRoom chatRoom){
         synchronized(chatRoomList)
         {
             chatRoomList.add(chatRoom);
         }
     }
     
-    private void removeUser(UserProxy user){
+    void removeUser(UserProxy user){
         synchronized(userProxyList)
         {
             userProxyList.remove(user);
         }
     }
     
-    private void removeRoom(ChatRoom chatRoom){
+    void removeRoom(ChatRoom chatRoom){
         synchronized(chatRoomList)
         {
             chatRoomList.remove(chatRoom);
         }
     }
+    
     public ChatRoom getRoomFromName(String name){
         ChatRoom localChatRoom = null;
         try{
@@ -421,16 +433,5 @@ public class ChatServer {
         }
         
     }
-    
-    boolean isEmpty(String string){
-        if(string.equals("")
-                || string==null
-                || string.equalsIgnoreCase("null")
-                || string.equals("\\r\\n")){
-            return true;
-        }else{
-            return false;
-        }
-    }
-    
+        
 }
